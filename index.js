@@ -48,6 +48,22 @@ app.use(bodyParser.urlencoded({
 // parse application/json
 app.use(bodyParser.json());
 
+
+//sample
+app.get('/todo/sample', (req,res) => {
+    database.query(
+        `SELECT * FROM items WHERE userId = 1`,
+        (error, results) => {
+            if(error){
+                res.status(500).json({message: 'Error in fetching items'});
+                return
+            }
+
+            res.json({todo: results});
+        }
+    )
+});
+
 app.get('/', (req, res) => {
 
     database.query('SELECT * FROM users', function(error, results, fields){
@@ -151,6 +167,101 @@ app.get('/todo', (req, res) => {
     )
 
 });
+
+app.get('/todo/:id', (req, res) => {
+
+    let query = `SELECT * FROM items WHERE id=${req.params.id} AND userId=${req.user.id}`
+    database.query(
+        query,
+        (error, results) => {
+            if(error){
+                console.error(error);
+                res.status(400).json({message: 'Error in getting item'});
+                return;
+            }else if(results.length == 0){
+                res.status(404).json({message: 'Todo item not found'});
+                return;
+            }
+            res.json(results[0]);
+        }
+    )
+
+});
+
+app.put('/todo/:id', (req, res) => {
+
+    let isCompleted = req.body.isCompleted;
+    let title = req.body.title;
+
+    if(!title || (typeof isCompleted === 'undefined')){
+        res.status(400).json({message: 'Missing parameters. \'title\' and "isCompleted" are required'});
+        return
+    }
+
+    let query = `UPDATE items SET isCompleted=${isCompleted}, title='${title}' WHERE id=${req.params.id} AND userId=${req.user.id}`;
+    database.query(
+        query,
+        (error, results) => {
+            if(error){
+                console.log(query);
+                console.log(error);
+                res.status(400).json({message: 'Error in udpating item'});
+                return 
+            }else{
+                
+                //get the updated item
+                database.query(
+                    `SELECT * FROM items WHERE id=${req.params.id} LIMIT 1`,
+                    (error, results)=> {
+                        if(error){
+                            res.status(500).json({message: 'Item updated but failed to fetch new items'});
+                            return;
+                        }else if(results.length < 0){
+                            res.status(500).json({message: 'Unable to fetch updated item'});
+                            return;
+                        }
+                        res.json(results[0]);
+                    }    
+                )
+
+            }
+        }
+    )
+
+})
+
+app.delete('/todo/:id', (req, res) => {
+
+    let id = req.params.id;
+    let userId = req.user.id;
+
+    if(!id || !userId){
+        res.status(400).json({message: 'Required parameters missing'});
+        return;
+    }
+
+    let query = `DELETE FROM items WHERE id=${id} AND userId=${userId}`;
+    database.query(
+        query,
+        (error, results) => {
+            if(error){
+                console.error(error);
+                res.status(400).json({message: 'Unable to delete item'});
+                return;
+            }
+
+            if(results.affectedRows > 0){
+                res.status(200).json({message: 'Successfully deleted item'});
+                return;
+            }else{
+                res.status(400).json({message: 'Failed to delete item'});
+                return;
+            }
+        }
+    );
+});
+
+
 
 
 app.get('/secret', (req, res) => {
